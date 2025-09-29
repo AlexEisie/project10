@@ -4,13 +4,14 @@ from scapy.all import *
 from collections import defaultdict
 from optparse import OptionParser
 import os
-import keyboard
+from pynput import keyboard
 
 # 用于存储目标IP和其对应的流量大小
 ip_traffic = defaultdict(int)
 
 # 当前展示的数量，默认为前十个
 display_count = 10
+listener = None
 
 # 定义回调函数，用于处理每个捕获的数据包
 def packet_callback(packet):
@@ -47,11 +48,7 @@ def capture_traffic(interface="mirror-eth0"):
             sniff(iface=interface, prn=packet_callback, store=0, timeout=1)
             print_traffic()  # 每秒刷新一次显示
 
-            # 如果用户按下 'A'，切换展示更多或折叠
-            if keyboard.is_pressed('a'):
-                display_count = len(ip_traffic) if display_count == 10 else 10
-                time.sleep(0.5)  # 防止多次触发
-
+            # 监听按键事件
             time.sleep(1)  # 控制刷新频率
     except KeyboardInterrupt:
         print("\n捕获停止。")
@@ -72,6 +69,15 @@ def generate_report():
     
     print("报告已生成：traffic_report.txt")
 
+# 监听键盘事件
+def on_press(key):
+    global display_count
+    try:
+        if key.char == 'a':  # 按下 'A' 键切换显示内容
+            display_count = len(ip_traffic) if display_count == 10 else 10
+    except AttributeError:
+        pass
+
 # 主函数
 if __name__ == "__main__":
     # 设置命令行参数
@@ -80,6 +86,10 @@ if __name__ == "__main__":
                       help="指定监听的网络接口，默认 'mirror-eth0'")
     
     (options, args) = parser.parse_args()
+
+    # 启动键盘监听
+    listener = keyboard.Listener(on_press=on_press)
+    listener.start()
     
     # 捕获流量并显示
     capture_traffic(interface=options.interface)
