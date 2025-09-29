@@ -34,7 +34,7 @@ def sort_and_print_traffic():
 # 主函数
 if __name__ == "__main__":
     # 捕获流量
-    capture_traffic(interface="eth0")  # 根据你的网卡名称修改 'eth0'
+    capture_traffic(interface="mirror-eth0")  # 根据你的网卡名称修改 'eth0'
 
     # 排序并打印结果
     sort_and_print_traffic()
