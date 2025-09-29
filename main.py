@@ -1,5 +1,9 @@
+import sys
+import time
 from scapy.all import *
 from collections import defaultdict
+from optparse import OptionParser
+import os
 
 # 用于存储目标IP和其对应的流量大小
 ip_traffic = defaultdict(int)
@@ -14,27 +18,36 @@ def packet_callback(packet):
         # 累加目标IP的流量
         ip_traffic[dst_ip] += packet_size
 
-# 开始捕获网络流量，过滤出IP包
-def capture_traffic(interface="eth0"):
-    print(f"开始捕获流量 on {interface}...")
-    sniff(iface=interface, prn=packet_callback, store=0)
-
-# 排序并打印目的IP及其流量
-def sort_and_print_traffic():
-    # 按照流量大小排序
-    sorted_ips = sorted(ip_traffic.items(), key=lambda x: x[1], reverse=True)
-    
-    print("\n流量目的地 IP 排序：")
+# 实时打印目标IP及其流量
+def print_traffic():
+    os.system('clear')  # 清屏
     print(f"{'目标IP':<20} {'流量大小 (字节)'}")
     print("-" * 40)
     
+    # 排序并输出
+    sorted_ips = sorted(ip_traffic.items(), key=lambda x: x[1], reverse=True)
     for ip, traffic in sorted_ips:
         print(f"{ip:<20} {traffic}")
+    
+# 捕获网络流量并实时更新
+def capture_traffic(interface="mirror-eth0"):
+    print(f"开始捕获流量 on {interface}...")
+    try:
+        while True:
+            sniff(iface=interface, prn=packet_callback, store=0, timeout=1)
+            print_traffic()  # 每秒刷新一次显示
+            time.sleep(1)  # 控制刷新频率
+    except KeyboardInterrupt:
+        print("\n捕获停止。")
 
 # 主函数
 if __name__ == "__main__":
-    # 捕获流量
-    capture_traffic(interface="mirror-eth0")  # 根据你的网卡名称修改 'eth0'
-
-    # 排序并打印结果
-    sort_and_print_traffic()
+    # 设置命令行参数
+    parser = OptionParser()
+    parser.add_option("-i", "--interface", dest="interface", default="mirror-eth0", 
+                      help="指定监听的网络接口，默认 'mirror-eth0'")
+    
+    (options, args) = parser.parse_args()
+    
+    # 捕获流量并显示
+    capture_traffic(interface=options.interface)
