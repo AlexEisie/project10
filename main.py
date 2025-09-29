@@ -5,9 +5,12 @@ from collections import defaultdict
 from optparse import OptionParser
 import os
 import re
+import socket
+import struct
 
 # 用于存储目标IP和其对应的流量大小
 ip_traffic = defaultdict(int)
+cidr_traffic = defaultdict(int)
 
 # 定义回调函数，用于处理每个捕获的数据包
 def packet_callback(packet):
@@ -18,6 +21,10 @@ def packet_callback(packet):
         packet_size = len(packet)
         # 累加目标IP的流量
         ip_traffic[dst_ip] += packet_size
+        
+        # 计算目标IP地址的CIDR /24
+        cidr_prefix = get_cidr_prefix(dst_ip)
+        cidr_traffic[cidr_prefix] += packet_size
 
 # 自动转换字节大小到合适的单位（B, KB, MB, GB, TB, PB）
 def format_size(size_in_bytes):
@@ -31,9 +38,23 @@ def format_size(size_in_bytes):
     
     return f"{size:.2f} {units[unit_index]}"
 
+# 获取IP地址的CIDR前缀（/24）
+def get_cidr_prefix(ip):
+    ip_parts = ip.split('.')
+    return f"{ip_parts[0]}.{ip_parts[1]}.{ip_parts[2]}.0/24"
+
+# 计算运行时间
+def format_runtime(start_time):
+    elapsed = time.time() - start_time
+    hours = int(elapsed // 3600)
+    minutes = int((elapsed % 3600) // 60)
+    seconds = int(elapsed % 60)
+    return f"{hours:02}:{minutes:02}:{seconds:02}"
+
 # 实时打印目标IP及其流量（默认显示前20个）
-def print_traffic():
+def print_traffic(start_time):
     os.system('clear')  # 清屏
+    print(f"运行时间: {format_runtime(start_time)}")
     print(f"{'目标IP':<20} {'流量大小'}")
     print("-" * 40)
     
@@ -41,6 +62,15 @@ def print_traffic():
     sorted_ips = sorted(ip_traffic.items(), key=lambda x: x[1], reverse=True)[:20]
     for ip, traffic in sorted_ips:
         print(f"{ip:<20} {format_size(traffic)}")
+    
+    print("\nCIDR /24 子网流量统计（前10个）：")
+    print(f"{'CIDR/24':<20} {'流量大小'}")
+    print("-" * 40)
+    
+    # 排序并输出前10个CIDR子网
+    sorted_cidr = sorted(cidr_traffic.items(), key=lambda x: x[1], reverse=True)[:10]
+    for cidr, traffic in sorted_cidr:
+        print(f"{cidr:<20} {format_size(traffic)}")
 
 # 捕获网络流量并实时更新
 def capture_traffic(interface="mirror-eth0", capture_duration=None):
@@ -50,7 +80,7 @@ def capture_traffic(interface="mirror-eth0", capture_duration=None):
     try:
         while True:
             sniff(iface=interface, prn=packet_callback, store=0, timeout=1)
-            print_traffic()  # 每秒刷新一次显示
+            print_traffic(start_time)  # 每秒刷新一次显示
             time.sleep(1)  # 控制刷新频率
             
             # 如果设置了捕获时长，检查是否到达捕获时长
@@ -70,6 +100,14 @@ def save_traffic_to_file(filename="traffic_data.txt"):
         sorted_ips = sorted(ip_traffic.items(), key=lambda x: x[1], reverse=True)
         for ip, traffic in sorted_ips:
             file.write(f"{ip:<20} {format_size(traffic)}\n")
+        
+        file.write("\nCIDR /24 子网流量统计（前10个）：\n")
+        file.write(f"{'CIDR/24':<20} {'流量大小'}\n")
+        file.write("-" * 40 + "\n")
+        sorted_cidr = sorted(cidr_traffic.items(), key=lambda x: x[1], reverse=True)[:10]
+        for cidr, traffic in sorted_cidr:
+            file.write(f"{cidr:<20} {format_size(traffic)}\n")
+    
     print(f"数据已保存到 {filename}")
 
 # 时间格式解析函数（解析捕获时间）
