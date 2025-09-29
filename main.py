@@ -19,16 +19,28 @@ def packet_callback(packet):
         # 累加目标IP的流量
         ip_traffic[dst_ip] += packet_size
 
+# 自动转换字节大小到合适的单位（B, KB, MB, GB, TB, PB）
+def format_size(size_in_bytes):
+    units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+    size = size_in_bytes
+    unit_index = 0
+    
+    while size >= 1024 and unit_index < len(units) - 1:
+        size /= 1024
+        unit_index += 1
+    
+    return f"{size:.2f} {units[unit_index]}"
+
 # 实时打印目标IP及其流量（默认显示前20个）
 def print_traffic():
     os.system('clear')  # 清屏
-    print(f"{'目标IP':<20} {'流量大小 (字节)'}")
+    print(f"{'目标IP':<20} {'流量大小'}")
     print("-" * 40)
     
     # 排序并输出前20个目标IP
     sorted_ips = sorted(ip_traffic.items(), key=lambda x: x[1], reverse=True)[:20]
     for ip, traffic in sorted_ips:
-        print(f"{ip:<20} {traffic}")
+        print(f"{ip:<20} {format_size(traffic)}")
 
 # 捕获网络流量并实时更新
 def capture_traffic(interface="mirror-eth0", capture_duration=None):
@@ -53,11 +65,11 @@ def capture_traffic(interface="mirror-eth0", capture_duration=None):
 # 将流量数据保存到文件
 def save_traffic_to_file(filename="traffic_data.txt"):
     with open(filename, "w") as file:
-        file.write(f"{'目标IP':<20} {'流量大小 (字节)'}\n")
+        file.write(f"{'目标IP':<20} {'流量大小'}\n")
         file.write("-" * 40 + "\n")
         sorted_ips = sorted(ip_traffic.items(), key=lambda x: x[1], reverse=True)
         for ip, traffic in sorted_ips:
-            file.write(f"{ip:<20} {traffic}\n")
+            file.write(f"{ip:<20} {format_size(traffic)}\n")
     print(f"数据已保存到 {filename}")
 
 # 时间格式解析函数（解析捕获时间）
